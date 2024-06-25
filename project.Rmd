@@ -1,0 +1,370 @@
+---
+title: "Project"
+author: "Moiyyad Sufi"
+date: "2024-04-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyr)
+library(readr)
+library(dplyr)
+options(dplyr.summarise.inform = FALSE)
+library(ggplot2)
+library(patchwork)
+library(ggmosaic)
+library(gganimate)
+library(countrycode)
+```
+
+## An analysis of climate induced natural disasters and its effects on various countries
+
+### Introduction
+
+$CO_2$ emissions, rising global temperature and climate-induced natural disaster rate is an oft-studied topic. In this project we would like to analyze the trends of worldwide emissions, the countries and industries that are the sources of these emissions. We will also explore the trends and distribution of natural disasters, and how these relate to worldwide emissions.
+
+We will do this by exploring datasets which contain the yearly CO2 emissions by country and industry in the period 1995 to 2018 and the corresponding yearly counts of various natural disasters by country.
+
+In summary, we would like to answer the following questions:
+
+- What trends can we observe over time in Emissions by Industry and Disasters by Type?
+- What are the sources of carbon emissions? Which sources correspond to higher emitters of CO2?
+- Is there any correlation between the countries with high emissions and high disaster rate?
+
+
+### Data Sources
+
+For this purpose we would like to use the following data sets:
+
+ 1. [CO₂ Emissions, Emissions Intensities, and Emissions Multipliers](https://climatedata.imf.org/datasets/7cec1228bfbe4a5e876ca5a5abedd64f)
+
+**Description:** CO₂ emissions; CO₂ direct and indirect emissions per unit of output by industry and by country. CO₂ emissions by industry, in aggregate terms and in terms of output by industry for the period 1995 to 2022.
+
+
+ 2. [Climate-related Disasters Frequency](https://climatedata.imf.org/datasets/b13b69ee0dde43a99c811f592af4e821)
+
+**Description:** Trend in number of climate related natural disasters for the period 1995 to 2018.
+
+
+*These data sources have been obtained from https://climatedata.imf.org*
+
+### Emissions and disasters trend from 1995 to 2018
+
+First we will analyze the trend of emissions and count of climate induced disasters across the globe, divided by industry and type respectively. We plot the emissions of the 8 highest emission industries and other industries plotted in grey.
+
+Our hypotheses that the total emissions are growing worldwide is evident from the plot below.The most noticeable feature is the overall increasing trend for most industries, indicating growth in their total emissions over time. 'Electricity, gas, steam and A/C Supply' has the highest value and shows the steepest line of increase from about 7000 to 12000 M tonnes of CO2.
+
+The "Air transport" industry is second highest growing from 1300 to 4000, with other industries with notable increases, with the exception of other non-metallic mineral products, which has a decrease over this period of time.
+
+```{r theme, echo=FALSE}
+# Define the custom color palette
+Top_Ind_Color_Palette = c("Air transport" = "#5f86b7",
+                   "Basic metals" = "#318700",
+                   "Chemicals and pharmaceutical products" = "#b2b67a",
+                   "Coke and refined petroleum products" = "#373c71",
+                   "Electricity, gas, steam and air conditioning supply" = "#ff0000",
+                   "Land transport and transport via pipelines" = "#6fdab2",
+                   "Other non-metallic mineral products" = "#ff5397",
+                   "Water transport" = "#ff9e00",
+                   "Other" = "grey75")
+
+common_theme = theme_minimal()+
+  theme(legend.position = c(0.2,0.8),legend.key.size = unit(0.1,"cm"), legend.text = element_text(size = 5), axis.text = element_text(size = 5), legend.title = element_text(size = 8))
+
+```
+
+```{r trends_emission, echo=FALSE}
+emissions = read_csv("Indicator_2_Carbon_Emission_per_unit_of_Output_-2381918267560819106.csv", show_col_types = FALSE)
+
+emissions = select(emissions, 
+                   'Country', 'ISO3','Indicator', 'Unit', 'Industry',
+                   colnames(emissions[,13:ncol(emissions)]))
+
+emissions = pivot_longer(emissions, 
+                         -c('Country', 'ISO3','Indicator', 'Unit', 'Industry'), 
+                         names_to = "Year", 
+                         values_to = "Value")
+emissions = emissions |> filter(emissions$Indicator == 'CO2 emissions' | emissions$Indicator == 'CO2 emissions intensities')
+emissions[emissions == 0] = NA
+
+emissionsFiltered = filter(emissions, emissions$Indicator == 'CO2 emissions')
+
+
+emissionsByIndustry = group_by(emissionsFiltered, Industry) |> summarize(
+ TotalValue = sum(Value, na.rm = TRUE)
+ ) |> ungroup() |> arrange(desc(TotalValue))
+
+emissionsFiltered$Ind = ifelse(emissionsFiltered$Industry %in% emissionsByIndustry[1:8,]$Industry, emissionsFiltered$Industry, 'Other')
+
+
+emissionsByIndustryYear = group_by(emissionsFiltered, Year, Ind, Industry) |> summarize(
+     TotalValue = sum(Value, na.rm = TRUE)
+ ) |> ungroup()
+
+options(repr.plot.width =20, repr.plot.height =20) 
+ 
+emissionsByIndustryYearLarge = emissionsByIndustryYear |> filter(Ind != "Other")
+emissionsByIndustryYearOther = emissionsByIndustryYear |> filter(Ind == "Other")
+
+
+
+ggplot(emissionsByIndustryYearLarge, aes(x= Year, y= TotalValue)) +
+  geom_line(data = emissionsByIndustryYearOther,mapping = aes(x= Year, y= TotalValue,group=Industry) ,color="grey75") + 
+  geom_line(mapping = aes(group = Ind ,color = Ind)) + 
+  scale_color_manual(values = Top_Ind_Color_Palette) +
+  labs(title="Carbon emissions of various industries from 1995 to 2018", y= "CO2 (Mill. of Metric Tonnes", color = "Industry") + common_theme
+  
+
+
+```
+
+Next we see significant fluctuations in disaster counts over the time period, with storms (green line) reaching peaks around 170-180 in certain years like 2005 and 2010. Droughts (blue line) also exhibit high peaks around 150-160 counts in years like 1997 and 2003. Extreme temperatures (yellow line) peak around 120-130 counts. 
+
+Landslides (red line) and wildfires (purple line) generally have lower counts, mostly under 50 throughout the period. Along with a high year-to-year variability, a slight overall increasing or decreasing trends can be observed for most indicators over the long term.
+
+
+```{r trends_disaster, echo=FALSE}
+disasters = read_csv("Indicator_11_1_Physical_Risks_Climate_related_disasters_frequency_7212563912390016675.csv", show_col_types = FALSE)
+
+disasters = select(disasters, 
+                   'Country', 'ISO3', 'Indicator', 'Unit',
+                   colnames(disasters[,11:ncol(disasters)]))
+
+disasters = pivot_longer(disasters, -c("Country","ISO3","Indicator", "Unit"), names_to = "Year", values_to = "Value")
+disasters[is.na(disasters)] = 0
+disasters = disasters[(disasters$Year > 1994 & disasters$Year < 2019),]
+disasters$Indicator = sub("Climate related disasters frequency, Number of Disasters: ", "", disasters$Indicator)
+
+disastersByYearIndicator = disasters |> group_by(Year, Indicator) |> summarize(Total = sum(Value)) |> ungroup() 
+disastersByYearIndicator =  disastersByYearIndicator[!(disastersByYearIndicator$Indicator %in% "TOTAL"),]
+
+ggplot(disastersByYearIndicator, mapping = aes(x=Year, y= Total, group=Indicator, color=Indicator))+
+  geom_line() +
+  labs(title="Count of natural disasters related to climate change from 1995 to 2018", y= "Count", color = "Type") +
+  common_theme
+```
+
+### Proportions of emissions by Country and Industry in 2018
+
+We will now analyze how emissions by different countries and how total emissions relate to what industries are responsible for them. For this we will choose an assortment of countries - which lie on the 25th, 50th, 75th, 90th and 95th percentiles respectively in terms of total emissions in 2018.
+
+Plotting these metrics, we see a that the vast majority of emissions come from a few countries indicated by the the high amounts of the 95th percentile countries and comparatively low emissions of the 90th percentile countries.
+
+Although the distribution of Industries based on the proportions chart seems random a few things can be observed:
+
+* Utilities like electricity, gas, steam and A/C supply is by far the largest contributor of emissions across the board
+* Basic Metal production seems to be a significant proportions of higher emission countries.
+* Countries whose economies are  associated with trade and shipping like Hong Kong and Greece have a significant proportion of their emissions coming from Water Transport compared to Land transport in other countries
+* Lower emission countries seem to have upto half of their emissions coming from other sources rather than the main sources in the dataset.
+
+```{r emissionProportions, echo=FALSE}
+emissionsByCountryIndustry2018 = emissionsFiltered |> 
+  filter(emissionsFiltered$Year == 2018) |> 
+  group_by(Country, Ind) |>
+  summarise(Value = sum(Value, na.rm= TRUE)) |> ungroup()
+
+emissionsByCountry2018 = emissionsByCountryIndustry2018 |>
+  group_by(Country) |>
+  summarise(TotalValue = sum(Value, na.rm= TRUE)) |> ungroup() |>
+    arrange(desc(TotalValue))
+
+n = nrow(emissionsByCountry2018)
+indices <- c(floor(0.05 * n),floor(0.05 * n)+1, floor(0.25 * n), floor(0.25 * n)+1, floor(0.5 * n), floor(0.5 * n)+1, floor(0.75 * n), floor(0.75 * n)+1, floor(0.9 * n), floor(0.9 * n)+1)
+selected_countries <- emissionsByCountry2018[indices, ]
+selected_countries$Classification = as.factor(c("95%","95%","90%","90%","75%","75%", "50%","50%","25%","25%"))
+
+
+emissionsBySelectedCountry2018 = inner_join(emissionsByCountryIndustry2018, selected_countries, c("Country" = "Country")) 
+
+emissionsBySelectedCountry2018 = emissionsBySelectedCountry2018|> arrange(desc(TotalValue))
+
+
+emissionsBySelectedCountry2018$Ind <- factor(emissionsBySelectedCountry2018$Ind, levels = c(
+  "Other",
+  "Water transport" ,
+  "Other non-metallic mineral products",
+                   "Land transport and transport via pipelines",
+                   "Electricity, gas, steam and air conditioning supply" ,
+                   "Coke and refined petroleum products" ,
+                   "Chemicals and pharmaceutical products",
+                   "Basic metals",
+                   "Air transport"
+                   ))
+
+emissionsBySelectedCountry2018$Country <- factor(emissionsBySelectedCountry2018$Country,levels = unique(emissionsBySelectedCountry2018$Country))
+
+
+
+
+p1 =ggplot(emissionsBySelectedCountry2018, 
+       mapping = aes(x = Country, y=Value, fill=Ind))+
+  geom_bar(stat = "Identity", position = "stack")  +  
+  scale_fill_manual(values = Top_Ind_Color_Palette,
+                    breaks = rev(names(Top_Ind_Color_Palette)),
+                    name = "Industry") + 
+  theme_minimal() + 
+  theme(legend.position = c(0.8,0.8),legend.key.size = unit(0.1,"cm"), legend.text = element_text(size = 5))   +
+  facet_grid(rows = vars(Classification), scales = "free_y", switch = "y") + coord_flip()
+
+
+ 
+
+p2 = ggplot(emissionsBySelectedCountry2018, 
+       mapping = aes(x = Country, y=Value, fill=Ind))+
+  geom_bar(position = "fill", stat="identity")  +  
+  scale_fill_manual(values = Top_Ind_Color_Palette,
+                    breaks = rev(names(Top_Ind_Color_Palette)),
+                    name = "Industry") + 
+  theme_minimal() + 
+  theme(legend.position = "none",legend.key.size = unit(0.1,"cm"), legend.text = element_text(size = 5))   +
+  facet_grid(rows = vars(Classification), scales = "free_y", switch = "y") + coord_flip()
+
+p1/ p2 +plot_layout(ncol = 1)
+```
+
+### How emission proportions have changed over time
+
+We will now discuss how the the industry composition of carbon emissions for the above mentioned group of countries has shifted over time by dividing our Year time periods into intervals of 4-5 years, ranging from 1995 to 2018.
+
+By examining the mosaic plots across the different time intervals, we can observe the following:
+
+The overall size of the mosaic plots for China, P.R.: Mainland, and India appears to be increasing over time, indicating a rise in their total emissions.
+The utilities industry, represented by the red tiles, seems to have a significant contribution across most countries and time periods.
+The "Other" industry, represented by the light blue tiles, also has a substantial presence, suggesting that there are other sources of emissions not explicitly categorized in the given industries.
+For countries like the United Kingdom and Brunei Darussalam, the industry composition appears to be more stable over time, with fewer noticeable changes in the relative sizes of the tiles.
+In the later time periods (e.g., 2014-2018), the "Chemicals and pharmaceutical products" industry (green) and "Land Transportation" industry (turquoise) seem to have a more prominent presence, particularly in China, P.R.: Mainland and India.
+
+Overall, this plot highlights the varying compositions and trends of industries, allowing for the identification of potential areas of focus for emission reduction strategies within specific industries or countries.
+
+```{r emissionProportionTime, echo=FALSE, fig.height=8}
+emissionsBySelectedCountryIndustry = emissionsFiltered |>
+  filter(Country %in% selected_countries$Country) |>
+  group_by(Country, Ind, Year) |>
+  summarise(Value = sum(Value, na.rm= TRUE)) |> ungroup()
+
+emissionsBySelectedCountryIndustry$Country = factor(emissionsBySelectedCountryIndustry$Country, levels = selected_countries$Country)
+
+ggplot(emissionsBySelectedCountryIndustry)+
+  geom_mosaic(aes(x = product(Country), weight=Value, fill=Ind))  +  
+  scale_fill_manual(values = Top_Ind_Color_Palette,
+                    breaks = rev(names(Top_Ind_Color_Palette)),
+                    name = "Industry") + 
+  theme_minimal() + 
+  theme(legend.position = "none", axis.text.x = element_text(angle=30, size= 5), axis.text.y = element_text(size = 5, angle = 30, ), ) +coord_flip() + facet_wrap(~cut_number(as.numeric(Year), 6), ncol = 2,) + labs(y="Industry", x= "Country", main = "Proportion of emissions over time")
+
+```
+
+### How does emissions rate relate to natural disasters
+
+The following animation shows the emissions rate and count of natural disasters in a country over 1995 to 2005, with the black line denoting mean count of disasters in that year.
+
+We can generally see that 1999 and 2008 to 2010 were years with high disaster counts. We can also see that East Asia seems to be most effected by the disasters induced by carbon emissions. USA, China and India emerge as outliers in the data having large emissions and disaster counts.
+
+```{r emissionsDisastersAnim, echo=FALSE}
+emissionsByCountry = emissionsFiltered |> group_by(Country, Year) |>
+  summarise(Emissions = sum(Value, na.rm= TRUE)) |> ungroup()
+
+disasterByCountry = disasters |> filter(Indicator == "TOTAL") |> group_by(Country, Year) |> summarise(Disasters = sum(Value))
+
+disastersEmissionsByCountry = inner_join(emissionsByCountry,disasterByCountry, c("Country" = "Country", "Year" = "Year"))
+
+disastersEmissionsByCountry = disastersEmissionsByCountry |>
+     mutate(Region = countrycode(sourcevar = Country, 
+                                 origin = "country.name",
+                                 destination = "region"))
+
+yearlyMeans = aggregate(disastersEmissionsByCountry$Disasters, list(disastersEmissionsByCountry$Year), FUN=mean)
+
+disastersEmissionsByCountry = left_join(disastersEmissionsByCountry, yearlyMeans, c("Year" = "Group.1"))
+
+disastersEmissionsByCountry = rename(disastersEmissionsByCountry,MeanDisasters=x)
+
+
+ 
+p = ggplot(disastersEmissionsByCountry, aes(x=Disasters, y= Emissions, color = Region)) + geom_point()+
+    geom_text(aes(x = 17, y = 4500, label = as.character(Year)),
+              size = 10, color = "grey",
+              hjust = "center", vjust = "center") +
+  geom_label(label=disastersEmissionsByCountry$Country) + geom_vline(aes(xintercept = MeanDisasters)) + theme_minimal()
+
+animate(p + transition_states( Year, transition_length = 2, state_length = 0))
+
+```
+
+Now we will move ahead with a map based analysis to get an idea of the geographic distributions of various disasters. We will plot count of Disaster events by country over the period 1995 to 2018 faceting on various disasters.
+
+We can discern some interesting patterns:
+
+1. Drought: There are large contiguous areas showing high drought risk, particularly across North Africa, the Middle East, Central Asia, and parts of North America.
+2. Extreme Temperature: High-risk regions are more dispersed but include areas like Northern Africa, the Middle East, Central Asia, southwestern North America, and parts of South America.
+3. Flood: High flood risk is prevalent across Southeast Asia, parts of South Asia, Central Africa, and some coastal regions like eastern North America.
+4. Landslide: Landslide risk appears elevated in mountainous regions like the Himalayas, Andes, and certain island arcs.
+5. Storm: Storm patterns are quite dispersed, but hotspots include the Caribbean, coastal Southeast Asia, and some mid-latitude coastal areas.
+6. Wildfire: Wildfire risk is pronounced in parts of North America, the Mediterranean, Australia, and some regions of South America and Africa.
+
+```{r disastersMap, echo=FALSE}
+world = map_data("world")
+world$iso3 <- countrycode(world$region, "country.name", "iso3c")
+
+disastersByCountry = disasters |> group_by(Country,ISO3, Indicator) |> summarise(Value=sum(Value, na.rm=TRUE)) |> ungroup()
+
+disasterByCountryMap = left_join(disastersByCountry, world, c("ISO3"="iso3"), relationship="many-to-many")
+
+disasterByCountryMap = disasterByCountryMap[-(which(disasterByCountryMap$Indicator == "TOTAL")),]
+disasterByCountryMap[disasterByCountryMap$Value>150,]$Value = 150
+
+disasterByCountryMap = left_join(disasterByCountryMap, disastersEmissionsByCountry, c("Country" = "Country"),relationship ="many-to-many")
+
+ggplot(disasterByCountryMap , aes(long, lat, group = group))+
+    geom_polygon(aes(fill = Value ), color = "white")+
+    scale_fill_viridis_c(option = "C") +facet_wrap(~Indicator) +
+  theme_minimal() + 
+  theme(axis.title.x=element_blank(), axis.text.x=element_blank(),  axis.ticks.x=element_blank(),
+        axis.title.y=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank(), 
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank())+ labs(title="Geographic Distribution of Disasters for 1995 to 2018")
+```
+Looking at the plot for Disasters and Emissions across the world over the time period 1995 to 2018, we can see the distribution of disasters and some evidence of the prevalence of disasters in high emission areas, particularly in East and South-East Asia and Europe, although further confounders can be taken into considerations to provide further proof for this hypotheses.
+
+```{r emissionsDisastersTrendMap, echo=FALSE, message=FALSE, warning=FALSE }
+disastersTotalSum = disasters |> filter(Indicator=="TOTAL") |> group_by(Country, ISO3, Year) |> summarise(Disasters = mean(Value, na.rm = 0))
+
+emissionsTotalSum = emissionsFiltered |> group_by(Country, ISO3, Year) |> summarise(Emissions = mean(Value, na.rm = TRUE)) |> ungroup()
+
+
+country_centroids= group_by(world, region, iso3) |>
+    summarize(x = mean(range(long)),
+             y = mean(range(lat)))
+
+disastersEmissionsByCountry = full_join(disastersTotalSum, emissionsTotalSum, c("Country" = "Country", "Year" = "Year"))
+
+EmissionsYearMap = left_join(world, disastersEmissionsByCountry,  c("iso3"="ISO3.x"), relationship = "many-to-many") 
+
+EmissionsYearMap = left_join(EmissionsYearMap, country_centroids, c("iso3"="iso3"), relationship = "many-to-many")
+EmissionsYearMap = EmissionsYearMap|>drop_na(Year)
+EmissionsYearMapDis = EmissionsYearMap |> group_by(Country, iso3, x,y) |> summarise(Disasters = mean(Disasters, na.rm= TRUE))
+
+
+ggplot(disasterByCountryMap  , aes(long, lat, group = group))+
+  geom_polygon(aes(fill = Emissions ))+ 
+  geom_point(data=EmissionsYearMapDis  ,aes(x=x, y=y, size = Disasters, group="Country"), alpha=0.2, color='brown')+
+  scale_fill_viridis_c(option = "C")
+  theme_minimal() + 
+  theme(axis.title.x=element_blank(), axis.text.x=element_blank(),  axis.ticks.x=element_blank(),
+        axis.title.y=element_blank(), axis.text.y=element_blank(), axis.ticks.y=element_blank(), 
+        panel.grid.major = element_blank(), panel.grid.minor = element_blank()) + 
+  labs(title="Emissions and Disasters for 1995 to 2018")
+
+```
+
+### Conclusion
+
+In conclusion, this analysis has explored the trends of global carbon emissions and climate-induced natural disasters over the period of 1995 to 2018. Several key findings emerge:
+
+* Total worldwide emissions have shown an increasing trend across most industries, with the electricity, gas, steam, and air conditioning supply sector being the largest contributor. However, there is significant variation across countries and industries in their emission patterns.
+* The frequency of climate-related natural disasters, such as storms, droughts, and extreme temperatures, has fluctuated considerably from year to year.
+* High-emission countries like China, India, and the United States have also experienced a higher frequency of natural disasters, suggesting a potential correlation between emissions and disaster occurrences. However, further analysis would be needed to establish a causal relationship and account for other confounding factors like population, GDP and industry-level production.
+* The geographic distribution of disasters reveals distinct patterns, with certain regions being more prone to specific types of disasters, such as droughts in North Africa and the Middle East, floods in Southeast Asia, and wildfires in parts of North America.
+* While the overall industry composition of emissions has remained relatively stable for some countries, others, like China and India, have seen a growing contribution from industries like chemicals and pharmaceuticals, and land transportation, reflecting their economic growth and development.
+
+This analysis highlights the complex interplay between carbon emissions, economic activities, and climate-induced natural disasters. Addressing these challenges will require a multifaceted approach, including promoting sustainable industrial practices, transitioning to renewable energy sources, and implementing effective disaster preparedness and mitigation strategies, particularly in high-risk regions. Continued monitoring and analysis of these trends will be crucial for informing policy decisions and collective efforts to mitigate the impacts of climate change.

@@ -1,0 +1,42 @@
+---
+title: "Project Proposal"
+author: "Moiyyad Sufi"
+date: "2024-03-17"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+## An analysis of climate induced natural disasters and its effects on various countries
+
+
+### Introduction
+
+$CO_2$ emissions, rising global temperature and natural disaster rate is an oft-studied topic. In this project we would like to analyze this topic from the point-of-view of causation of natural disasters. We will explore the trend of natural disasters by country, and if it is effected by the level of $CO_2$ emissions in that country. We will analyze the sources and trends of $CO_2$ emissions in the period 1995 to 2022, its relation to natural disasters and the countries most affected by these disasters.
+
+In summary, we would like to answer the following questions:
+
+- Are increasing carbon emissions causing more natural disasters?
+- What are the sources of carbon emissions?
+- Is there any correlation between the countries with high emissions and high disaster rate?
+
+
+### Data Sources
+
+For this purpose we would like to use the following data sets:
+
+ 1. [CO₂ Emissions, Emissions Intensities, and Emissions Multipliers](https://climatedata.imf.org/datasets/7cec1228bfbe4a5e876ca5a5abedd64f)
+
+**Description:** CO₂ emissions; CO₂ direct and indirect emissions per unit of output by industry and by country. CO₂ emissions by industry, in aggregate terms and in terms of output by industry for the period 1995 to 2022.
+
+
+ 2. [Climate-related Disasters Frequency](https://climatedata.imf.org/datasets/b13b69ee0dde43a99c811f592af4e821)
+
+**Description:** Trend in number of climate related natural disasters for the period 1980 to 2022.
+
+
+*These data sources have been obtained from https://climatedata.imf.org*
