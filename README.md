@@ -22,3 +22,8 @@ Description: CO₂ emissions; CO₂ direct and indirect emissions per unit of ou
 Description: Trend in the number of climate-related natural disasters for the period 1995 to 2018.
 
 These data sources have been obtained from https://climatedata.imf.org
+
+
+**To view this project, please run Project.html file**
+
+**To run this project, clone and run Project.Rmd file via RStudio** 
